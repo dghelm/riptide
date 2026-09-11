@@ -4,7 +4,8 @@ This file documents conventions, patterns, and preferences for working on the Ri
 
 ## Project Overview
 
-**Riptide** is a terminal-based music player for Tidal with a TUI interface built in Rust. It's undergoing an API modernization effort to migrate from Tidal v1 API to v2 API endpoints.
+**Riptide** is a terminal-based music player for Tidal with a TUI interface built in Rust.
+The Tidal v1 → v2 API migration is complete; only `get_stream_url` remains on v1, permanently.
 
 **Key Technologies:**
 - Language: Rust
@@ -12,6 +13,25 @@ This file documents conventions, patterns, and preferences for working on the Ri
 - API: Tidal (v1 and v2)
 - Player: mpv (via FFI)
 - Build: cargo, flake.nix (Nix support), AUR
+
+## Roadmap
+
+`ROADMAP.md` holds the candidate features nobody has started yet, each with the
+file reference that proves the gap and the questions still open on it. Read it
+before proposing new work — an idea that looks obvious from the outside has
+usually been weighed there already.
+
+**Mark an entry the moment its feature lands.** Move it under `## Shipped` with
+the version it went out in, or under `## Considered and Rejected` with the
+reason it will not be built. An entry left sitting under `## Candidates` after
+it ships gets proposed again a month later, and nothing in the file tells the
+next session that the work is already done.
+
+Every entry is also an issue on the **Riptide Development** board
+(<https://github.com/users/fezzik-the-giant/projects/2>), and its status there
+moves as the work does — `Ready` when a design is approved, `In progress` on
+branching, `In review` on opening the PR, `Done` on merge. `ROADMAP.md` holds
+the status table and the rest of the convention.
 
 ## Comments: why, not what
 Comments must explain *why* a non-obvious choice exists, never *what* the code literally does. The code is the what; the comment is the otherwise undeducible rationale.
@@ -66,7 +86,7 @@ advertises (`albumReplayGain`, `trackReplayGain`, both peak amplitudes).
 **Consequence:** `const BASE`, `dash_to_hls`, `build_flac_m3u8`, and the
 localhost manifest server in `src/manifest.rs` are load-bearing. Do not remove
 them as "dead v1 code." Full write-up is in the doc comment on
-`get_stream_url` in `src/api/client.rs`.
+`get_stream_url` in `src/api/client/streaming.rs`.
 
 ### Dolby Atmos Is Reachable — via `immersiveaudio`
 
@@ -170,6 +190,15 @@ way to advance is the cursor.
 - Always include `include` parameters on pagination requests to get full objects
 - Never add a `limit`/`offset` argument to a request type — it cannot do anything
 
+**The first page and its cursor pages have different shapes.** A collection
+fetched through its parent (`/playlists/{id}`) nests the rows under
+`data.relationships.items.data`, with the next link at
+`data.relationships.items.links.next`. A cursor page fetched from
+`/playlists/{id}/relationships/items` returns them flat in `data`, with the next
+link at top-level `links.next`. One parser cannot read both, which is why
+`parse_v2_playlist_tracks` and `parse_playlist_relationship_items` in
+`src/api/client/playlists.rs` are separate functions.
+
 ### Everything Loads Upfront — There Is No Lazy Loading
 
 Lists are fetched in full before they reach the UI. Two mechanisms do this:
@@ -209,8 +238,9 @@ and `StatefulList::next_offset` no longer exist. Do not reintroduce them.
 - Reference issue numbers when applicable
 
 ### Branch Strategy for Changes
+- Branch off latest master, named `feature/<short-description>` (e.g. `feature/stream-url-v2`)
 - For bug fixes / small changes: work on feature branch, test, then present for commit
-- For large features: use incremental approach (see API Modernization section above)
+- For large features: migrate one endpoint at a time (see "Do NOT Attempt Large Refactors" above)
 - Always sync with master before major work via rebase or merge
 
 ### Staging a Release
@@ -225,6 +255,19 @@ wrong version. CI fails the lint job if the spec and `Cargo.toml` disagree.
 
 Do not tag or push — a `v*` tag fires the public release workflow, and that is the
 maintainer's call.
+
+### Changelog Entries
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+and SemVer. Newest release first under `## [X.Y.Z] - YYYY-MM-DD`; unreleased work
+accumulates under `## [Unreleased]`.
+
+Four subsections in this order — **Added**, **Changed**, **Fixed**, **Internal** —
+omitting any that are empty. `Internal` is for changes with no user-visible effect.
+
+Entries are written for users, not lifted from the commit log: full sentences
+saying what changed and what it means for them, and for a fix, what the wrong
+behaviour actually was. Reference issue numbers (`(#54)`) and credit contributors
+by handle where they apply.
 
 ### File a PR
 Before filling, check whether a PR for this branch already exists. Review diff locally against 'origin/master' to make sure its contents mach the goal.
@@ -249,11 +292,15 @@ GOOD
 ## Code Style & Conventions
 
 ### File Organization
-- API functions: `src/api/client.rs`
+- API client: `src/api/client/` — one module per domain (`albums`, `artists`,
+  `playlists`, `search`, `streaming`, `tracks`); shared helpers in `mod.rs`
 - Data models: `src/api/models.rs`
-- State management: `src/app/state.rs`
-- UI rendering: `src/ui.rs`
-- Event handling: `src/app/responses.rs`
+- State: `src/app/state/` — `list.rs` holds `StatefulList`, `now_playing.rs` the
+  queue and mpv's view of it; also `detail.rs`, `keybinds.rs`, `settings.rs`,
+  `sort.rs`, `palette.rs`
+- UI rendering: `src/ui/` — `lists.rs` and `row.rs` own row shapes, one module per view
+- API responses: `src/app/responses.rs`
+- Key handling: `src/events/`
 
 ### Error Handling
 - Use `Result<T>` with `anyhow::Context` for error propagation
@@ -284,11 +331,6 @@ outcome and its counts replaces all of it.
 The point is a log someone can actually read: issue #43 went undiagnosed for days
 because the evidence (one track fetched 88 times) was buried in noise and no
 message named the anomaly.
-
-### Pagination in Lists
-- Use `StatefulList<T>` with `pagination_cursor: Option<String>` field
-- Let the server choose the batch size; never pass a count
-- Chain the next page from the response handler, not from a scroll event
 
 ### UI Patterns
 - The artist, search and Home views share one tab strip: `render_carousel` in
@@ -347,20 +389,15 @@ message named the anomaly.
 
 ## Troubleshooting Common Issues
 
-**"Pagination not working / only 20 items load"**
-- Check if `page[size]` parameter is being used (remove it)
-- Verify `page[cursor]` is being used instead
-- Ensure cursor value is being passed to next request
+**"A list stops after one page"**
+- `links.next` is a path, not a URL — resolve it with `absolute_url`
+- Check `append_page` was used, not `append` with a synthesised total
+- Confirm `include` parameters are repeated on the cursor request
 
 **"Newly favorited item doesn't show cover art"**
 - Check if track object includes full album data
 - Verify `include=albums,artists` parameters are present in requests
 - Track objects from favorites may need album data refresh
-
-**"Merge conflicts during rebase"**
-- **Stop and use incremental approach instead**
-- Rebase large branches only if unavoidable
-- Better: merge and resolve conflicts in one go, then fix any issues
 
 ## Architecture Notes
 
@@ -473,99 +510,3 @@ Two mechanisms, because the two structures give different guarantees:
 The queue is deliberately left alone: what is queued is what plays, and hiding a
 queued row would desync it from mpv. Its badge still drops to the truth, which is
 why `quality_badge` takes the setting.
-
-## Remaining V1 API Usage & Refactoring Opportunities
-
-### Complete V1 API Usage Inventory
-
-**Exactly one v1 caller remains, and it is intentional:**
-
-| Function | Endpoint | File | Status |
-|----------|----------|------|--------|
-| get_stream_url | `/tracks/{id}/playbackinfopostpaywall` | client.rs:3022 | **v1 permanently** — v2 is DRM-encrypted, see "Stream URLs Stay on v1" above |
-
-Everything else now targets openapi.tidal.com/v2. The v1 helpers that used to
-back the migrated endpoints (`get`, `post_form`, `delete`, `uid`) have been
-deleted; `const BASE` survives solely for `get_stream_url`.
-
-### Pagination Refactoring — Done
-
-The duplicated scroll-triggered loading this section used to describe is gone.
-`should_load_more()`, `check_load_more()`, `next_offset` and the per-list
-`load_more_*` helpers were deleted once every list moved to upfront loading;
-`ApiRequest` variants no longer carry `offset`. See "Everything Loads Upfront"
-above before adding anything back here.
-
-### Code Duplication & Standardization Opportunities
-
-**1. Query Parameter Building (5+ instances)**
-- Files: `client.rs` in `get()` `:1242`, `get_openapi()` `:1298`, `post_form()` `:1385`, `delete()` `:2271`, `search_*` `:1917` etc.
-- Pattern: Build `all_params` vec, add countryCode, optionally sessionId, extend with params
-- **Opportunity:** Extract to `build_api_params()` helper
-
-**2. Error Response Parsing (2 instances)**
-- Files: `client.rs` `get()` `:1282-1290` (300 char snippet), `get_openapi()` `:1308-1314` (400 char snippet)
-- Pattern: Log error with body snippet, return formatted error
-- **Opportunity:** Extract to `parse_error_response()` helper
-
-**3. Favorite/Collection Management — Done**
-- All four removal sites now call `StatefulList::remove_where`, which owns the
-  `.retain()`, the `total` decrement, the refilter and the selection clamp.
-  Removing an item from a library list any other way will desync a filtered list.
-
-**4. Duplicate Deduplication (2 instances)**
-- Files: `responses.rs` `:20-28` (fav_albums dedup via HashSet), `:66-79` (favorites/playlists dedup)
-- Pattern: Filter out items already in collection using HashSet
-- **Opportunity:** Extract to `deduplicate_by_id()` helper
-
-**5. UI List Item Rendering (75+ instances)**
-- Files: `src/ui.rs` in `render_home_section`, `render_artist_list`, `render_fav_albums_list`, `render_artist_tracks_full`, `render_artist_albums` etc.
-- Anchor: `grep -rn "ListItem::new" src/ui.rs` or `grep -n "fn render_" src/ui.rs`
-- Pattern: Calculate visibility (`visible_items`, `ListViewport`), build `ListItem::new(Line::from(...))` with prefix + title + badge, apply styles
-- **Opportunity:** Extract to `create_list_item()` or styling component helper
-
-**6. Data Filtering & Transformation (8 instances)**
-- Files: `src/app/responses.rs` near `ApiResponse::FavAlbumsPage` / `ApiResponse::Playlists` dedup
-- Anchor: `grep -n "HashSet\|\.retain\|\.iter()\.map" src/app/responses.rs`
-- Pattern: `.iter().map()`, `.filter()`, `.collect()` with custom predicates
-- **Opportunity:** Extract filter predicates to reusable functions
-
-**7. Queue Extension (2 instances)**
-- Files: `src/app/responses.rs` (`source_playlist_*` handling), `src/app/playback.rs` (`toggle_shuffle`, `queue.shuffle`)
-- Anchor: `grep -n "shuffle\|source_playlist" src/app/playback.rs src/app/responses.rs`
-- Pattern: Extend queue with shuffle handling, track source/offset
-- **Opportunity:** Extract to `extend_queue_with_shuffle()` helper
-
-### Refactoring Priority Matrix
-
-| Helper | Impact | Effort | Files Affected | Lines Saved | Priority |
-|--------|--------|--------|-----------------|------------|----------|
-| Query Param Builder | High | Low | client.rs (4 places) | 60+ | **P0** |
-| Error Parser | Medium | Low | client.rs (2 places) | 20+ | P1 |
-| ~~Collection Manager~~ | — | — | done: `StatefulList::remove_where` | 30+ | — |
-| Deduplication | Medium | Low | responses.rs (2 places) | 15+ | P1 |
-| UI List Item | High | High | ui.rs (75+ places) | 200+ | P2 |
-| Queue Extension | Low | Medium | responses.rs, playback.rs | 25+ | P2 |
-
-### Recommended Refactoring Sequence
-
-1. **Phase 1 (Quick Wins):** Query param builder + Error parser (P0 items)
-   - Low effort, high code clarity improvement
-   - Estimated: 2-3 hours
-
-2. **Phase 2 (Core Stability):** Collection manager + deduplication
-   - Medium effort, eliminates major duplication
-   - Estimated: 4-5 hours
-
-3. **Phase 3 (Polish):** UI rendering helper (if time permits)
-   - High effort, significant code reduction
-   - Estimated: 6-8 hours
-
-## Related Documentation
-
-See project memory for detailed notes:
-- `api_refactor_lessons.md` - Lessons from v1→v2 migration attempts
-- `api_v2_patterns.md` - Working patterns for v2 API
-- `pagination_strategy.md` - Consistent pagination approach
-- `tidal_api_pagination.md` - Tidal API specifics
-- `logging_strategy.md` - Debug logging guidelines
