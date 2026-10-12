@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An artist's albums, EPs, singles and top tracks were drawn straight from the backing list rather than the rows on screen. Nothing could narrow those lists before, so it never showed; hiding Atmos releases would have made the list draw rows its own header did not count
 - Resolving an Atmos track took three requests to Tidal instead of one. The first returned the Atmos stream, which was rejected for not being FLAC and re-requested twice over before the lowest tier accepted the identical stream
 
+### Internal
+- CI now builds the Nix flake. Nothing did before, so the flake could break while `cargo build` stayed perfectly green — which is exactly how 1.5.0 came to be tagged unbuildable on Nix
+
 ## [1.5.0] - 2026-09-10
 
 ### Added

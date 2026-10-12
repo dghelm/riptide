@@ -39,6 +39,25 @@ jobs:
           fi
           echo "riptide.spec is in sync at $CARGO_VER."
 
+  nix:
+    name: Nix build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # The flake filters its own source, so it can break while `cargo build`
+      # stays green: v1.5.0 shipped unbuildable on Nix because the filter
+      # dropped the cover art that `src/app/mod.rs` embeds, and nothing here
+      # ever built it to notice (#60). Builds the whole dependency tree from
+      # scratch, so expect this job to be the slow one.
+      - name: Build the flake
+        run: nix build .#riptide --print-build-logs
+
   test:
     name: Test
     runs-on: ubuntu-latest
