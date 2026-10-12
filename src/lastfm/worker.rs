@@ -62,13 +62,19 @@ impl LastfmWorker {
                 warn!("Last.fm client not initialized - missing session key or API credentials");
             }
             // Without credentials there is nothing the setting can turn on, so
-            // this loop exists only to keep the channels drained.
+            // this loop exists only to keep the channels drained. It must still
+            // stop when they close: a closed channel yields `None` from `recv`
+            // immediately and forever, so ignoring it spins this loop inside a
+            // single `poll` — never yielding, never ending. `main` joins the
+            // worker thread on the way out, so that hung the whole quit at 100%
+            // of a core (#61).
             loop {
                 tokio::select! {
-                    _ = self.cmd_rx.recv() => {},
-                    _ = self.player_evt_rx.recv() => {},
+                    cmd = self.cmd_rx.recv() => if cmd.is_none() { break },
+                    evt = self.player_evt_rx.recv() => if evt.is_none() { break },
                 }
             }
+            return;
         }
 
         debug!("Last.fm scrobbler started");
@@ -261,5 +267,41 @@ impl LastfmWorker {
                 warn!("No Last.fm client available for scrobbling");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The worker runs inside `block_on` on the shared worker thread, which
+    /// `main` joins on the way out, so a `run()` that never returns wedges the
+    /// whole process. The spin happens inside one `poll`, so it starves any
+    /// timer sharing its runtime — the worker needs its own thread for the
+    /// hang to be observable at all.
+    #[test]
+    fn a_worker_without_credentials_exits_when_its_channels_close() {
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let (player_evt_tx, player_evt_rx) = mpsc::unbounded_channel();
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        let worker = LastfmWorker::new(LastfmConfig::default(), cmd_rx, player_evt_rx, event_tx);
+        assert!(worker.client.is_none(), "setup: no credentials configured");
+
+        drop(cmd_tx);
+        drop(player_evt_tx);
+
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            tokio::runtime::Builder::new_current_thread()
+                .build()
+                .expect("tokio runtime")
+                .block_on(worker.run());
+            let _ = done_tx.send(());
+        });
+
+        done_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("run() must return once its senders are dropped, not spin forever");
     }
 }
