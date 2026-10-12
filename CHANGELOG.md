@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-12
 
 ### Added
 - A settings modal on `Shift+S`, covering Dolby Atmos, shuffle, the queue panel, volume and Last.fm scrobbling, over a read-only summary of the signed-in account. Everything in it was previously either a keybind you had to know about or a line in the config file

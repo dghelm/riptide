@@ -6,7 +6,7 @@
 %global debug_package %{nil}
 
 Name:           riptide
-Version:        1.5.0
+Version:        1.6.0
 Release:        1%{?dist}
 Summary:        Terminal UI music player for Tidal
 License:        GPL-3.0-or-later
@@ -55,6 +55,20 @@ cargo test --release --locked
 %{_bindir}/%{name}
 
 %changelog
+* Mon Oct 12 2026 Fezzik the Giant <noreply@github.com> - 1.6.0-1
+- Added: A settings modal on Shift+S, covering Dolby Atmos, shuffle, the queue panel, volume and Last.fm scrobbling, over a read-only summary of the signed-in account.
+- Added: Dolby Atmos is now a setting rather than something that happened to you.
+- Added: With Atmos off, releases Tidal holds only as an Atmos mix are hidden, the way the official apps hide them.
+- Changed: Atmos releases now play the stereo FLAC master unless Atmos is turned on.
+- Changed: Last.fm scrobbling can be turned on and off without restarting
+- Fixed: Installing with Nix failed to build, stopping at include_bytes! with a missing assets/wave-logo-320-transparent.png (#60).
+- Fixed: Quitting with q never finished when Last.fm was not set up.
+- Fixed: Playback stopped with No stream available for "…" once riptide had been open for about four hours — most often noticed after leaving it paused for a while and coming back to find the rest of the queue dead.
+- Fixed: A rejected session was reported as though the track were at fault.
+- Fixed: An artist's albums, EPs, singles and top tracks were drawn straight from the backing list rather than the rows on screen.
+- Fixed: Resolving an Atmos track took three requests to Tidal instead of one.
+- Internal: CI now builds the Nix flake.
+
 * Thu Sep 10 2026 Fezzik the Giant <noreply@github.com> - 1.5.0-1
 - Added: a on an album or playlist row queues the whole thing, and Alt+a puts it next (#54).
 - Added: Alt+f adds the playing track to your favorites from anywhere in the app.
