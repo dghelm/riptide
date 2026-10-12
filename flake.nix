@@ -33,7 +33,17 @@
           pname = cargoToml.package.name;
           version = cargoToml.package.version;
 
-          src = craneLib.cleanCargoSource ./.;
+          # Not `cleanCargoSource`: it keeps only Cargo and Rust sources, which
+          # drops `assets/` — and `src/app/mod.rs` embeds the fallback cover art
+          # from there with `include_bytes!`, so the build failed on a missing
+          # file rather than on anything Nix-specific (#60).
+          src = pkgs.lib.fileset.toSource {
+            root = ./.;
+            fileset = pkgs.lib.fileset.unions [
+              (craneLib.fileset.commonCargoSources ./.)
+              ./assets
+            ];
+          };
 
           nativeBuildInputs = [pkgs.pkg-config];
 
