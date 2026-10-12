@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Last.fm scrobbling can be turned on and off without restarting
 
 ### Fixed
+- Playback stopped with `No stream available for "…"` once riptide had been open for about four hours — most often noticed after leaving it paused for a while and coming back to find the rest of the queue dead. Tidal's access tokens last four hours and riptide only ever got one, at startup, so every stream request after that came back "token expired". It now renews the token as it approaches expiry, for streaming and for everything else, so a session can stay open as long as you like
+- A rejected session was reported as though the track were at fault. The quality fallback chain treated an expired token the same as a tier the account is not entitled to, so it retried the other two qualities and then blamed the track by name, while the real reason appeared only in a debug-level log line that the default settings do not record. An authentication failure now says so and stops
 - An artist's albums, EPs, singles and top tracks were drawn straight from the backing list rather than the rows on screen. Nothing could narrow those lists before, so it never showed; hiding Atmos releases would have made the list draw rows its own header did not count
 - Resolving an Atmos track took three requests to Tidal instead of one. The first returned the Atmos stream, which was rejected for not being FLAC and re-requested twice over before the lowest tier accepted the identical stream
 

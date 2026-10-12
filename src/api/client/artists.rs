@@ -188,7 +188,7 @@ fn parse_v2_user_collection_artists(
 
 impl ApiClient {
     pub async fn get_favorite_artists_v2(&self) -> Result<(Vec<Artist>, u32)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_artists = Vec::new();
         let mut total = 0u32;
         let mut next_url: Option<String> = Some(format!(
@@ -233,7 +233,7 @@ impl ApiClient {
     }
 
     pub async fn get_artist_picture(&self, artist_id: u64) -> Result<Option<String>> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!("{OPENAPI_BASE}/artists/{artist_id}?locale=en-US&include=profileArt");
 
         let resp = self
@@ -292,7 +292,7 @@ impl ApiClient {
     pub async fn get_artist_top_tracks(&self, artist_id: u64, _limit: u32) -> Result<Page<Track>> {
         tracing::debug!("Fetching all top tracks for artist {}", artist_id);
 
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_tracks = Vec::new();
         let mut next_url: Option<String> = Some(format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/tracks?locale=en-US&include=tracks.albums,tracks.artists&collapseBy=FINGERPRINT"
@@ -344,7 +344,7 @@ impl ApiClient {
     pub async fn get_artist_albums(&self, artist_id: u64, _limit: u32) -> Result<Page<Album>> {
         tracing::debug!("Fetching all albums for artist {}", artist_id);
 
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_albums = Vec::new();
         let mut next_url: Option<String> = Some(format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/albums?locale=en-US&include=albums"
@@ -398,7 +398,7 @@ impl ApiClient {
     }
 
     pub async fn get_artist_eps(&self, artist_id: u64, _limit: u32) -> Result<Page<Album>> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_albums = Vec::new();
         let mut next_url: Option<String> = Some(format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/albums?locale=en-US&include=albums"
@@ -450,7 +450,7 @@ impl ApiClient {
     }
 
     pub async fn get_artist_singles(&self, artist_id: u64, _limit: u32) -> Result<Page<Album>> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_albums = Vec::new();
         let mut next_url: Option<String> = Some(format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/albums?locale=en-US&include=albums"
@@ -502,7 +502,7 @@ impl ApiClient {
     }
 
     pub async fn get_artist_bio(&self, artist_id: u64) -> Result<String> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/biography?countryCode={}&include=biography",
             self.config.country_code

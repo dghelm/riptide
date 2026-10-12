@@ -350,7 +350,7 @@ impl ApiClient {
         }
         all_params.push(("include", "tracks.artists".to_string()));
 
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let body = self
             .http
             .get(&url)
@@ -379,7 +379,7 @@ impl ApiClient {
         }
         all_params.push(("include", "artists.profileArt".to_string()));
 
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let body = self
             .http
             .get(&url)
@@ -408,7 +408,7 @@ impl ApiClient {
         }
         all_params.push(("include", "playlists".to_string()));
 
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let body = self
             .http
             .get(&url)
@@ -434,7 +434,7 @@ impl ApiClient {
         let body = self
             .http
             .get(&url)
-            .bearer_auth(&self.token.read().await.clone())
+            .bearer_auth(&self.access_token().await?)
             .send()
             .await
             .context("HTTP request failed")?
@@ -453,7 +453,7 @@ impl ApiClient {
         let body = self
             .http
             .get(&url)
-            .bearer_auth(&self.token.read().await.clone())
+            .bearer_auth(&self.access_token().await?)
             .send()
             .await
             .context("HTTP request failed")?
@@ -469,7 +469,7 @@ impl ApiClient {
         let body = self
             .http
             .get(&url)
-            .bearer_auth(&self.token.read().await.clone())
+            .bearer_auth(&self.access_token().await?)
             .send()
             .await
             .context("HTTP request failed")?

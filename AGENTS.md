@@ -88,6 +88,36 @@ localhost manifest server in `src/manifest.rs` are load-bearing. Do not remove
 them as "dead v1 code." Full write-up is in the doc comment on
 `get_stream_url` in `src/api/client/streaming.rs`.
 
+### Access Tokens Live Four Hours — the Client Renews Them
+
+Verified live against `auth.tidal.com`: the device flow and the refresh grant
+both return `expires_in: 14400`. A session left open longer than that outlives
+its credentials, which is what issue "No stream available for …" turned out to
+be — the token was read once at startup and never renewed.
+
+Two facts the renewal path depends on:
+
+1. **The refresh grant does not rotate the refresh token.** The response carries
+   `access_token`, `expires_in`, `scope`, `token_type` and `user` — no
+   `refresh_token`. The one from the device flow stays valid, so renewal needs
+   no config write, and `main`'s exit-time `save_config` cannot clobber it.
+2. **The stored `session_id` survives renewal.** A new access token paired with
+   the old `sessionId` resolves streams normally, so there is no need to re-fetch
+   `/v1/sessions` on refresh.
+
+`ApiClient::access_token` is the single choke point: every request resolves its
+bearer token through it, and it renews under the write lock when within
+`REFRESH_MARGIN` of expiry. The worker spawns each request, so a batch can cross
+the boundary together — the write lock is what stops them all refreshing at once.
+Do not reintroduce a bare `self.token.read()`; it would silently opt that
+endpoint out of renewal.
+
+**401 is not a quality tier falling through.** `get_stream_url`'s `QUALITIES`
+chain treats `403` as "not entitled to this tier" and moves on, but a `401` is
+the session, and every remaining tier fails identically. It bails immediately.
+Falling through on it spent three requests to reach "no stream URL available for
+track", which named the track and hid the only fact that mattered.
+
 ### Dolby Atmos Is Reachable — via `immersiveaudio`
 
 Unlike hi-res, Atmos is not walled off. `playbackinfopostpaywall` takes an

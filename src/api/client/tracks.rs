@@ -307,7 +307,7 @@ impl ApiClient {
     pub async fn get_favorite_tracks(&self) -> Result<(Vec<Track>, u32)> {
         let started = std::time::Instant::now();
         let mut page = 0usize;
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut all_tracks = Vec::new();
         let mut total = 0u32;
         let mut next_url: Option<String> = Some(format!(
@@ -366,7 +366,7 @@ impl ApiClient {
     }
 
     pub async fn get_track_lyrics(&self, track_id: u64) -> Result<LyricsResponse> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/tracks/{track_id}/relationships/lyrics?countryCode={}&include=lyrics",
             self.config.country_code
@@ -432,7 +432,7 @@ impl ApiClient {
     }
 
     pub async fn get_track_details(&self, track_id: u64) -> Result<(Track, Option<String>)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/tracks/{track_id}?countryCode=US&include=albums.coverArt&include=artists"
         );

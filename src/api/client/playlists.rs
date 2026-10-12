@@ -373,7 +373,7 @@ impl ApiClient {
         Option<String>,
         Option<String>,
     )> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
 
         let url = if let Some(next) = next_url {
             // Use the next URL provided by the previous response
@@ -426,7 +426,7 @@ impl ApiClient {
         next_url: &str,
         total: u32,
     ) -> Result<(Vec<Track>, u32, Option<String>)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
 
         // Ensure the next URL includes the include=items.artists parameter
         let url = {

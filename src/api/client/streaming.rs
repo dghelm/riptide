@@ -276,7 +276,7 @@ impl ApiClient {
         const QUALITIES: &[&str] = &["LOSSLESS", "HI_RES_LOSSLESS", "HIGH"];
         let path = format!("/tracks/{track_id}/playbackinfopostpaywall");
         let debug = std::env::var("RIPTIDE_QUALITY_DEBUG").is_ok();
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let base_url = format!("{BASE}{path}");
 
         for &quality in QUALITIES {
@@ -316,10 +316,19 @@ impl ApiClient {
                     eprintln!("[quality] track {track_id}: {quality} request failed — {error_msg}");
                 }
 
-                if matches!(
-                    status,
-                    reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN
-                ) {
+                // 403 is tier-specific — the account is not entitled to this
+                // quality — so the chain moves on. 401 never is: the token is
+                // either expired or revoked, and every remaining tier will fail
+                // the same way. Falling through on it spent three requests to
+                // reach "no stream URL available", which named the track and
+                // hid the only fact that mattered.
+                if status == reqwest::StatusCode::UNAUTHORIZED {
+                    anyhow::bail!(
+                        "Tidal rejected the session (401). The access token could not be \
+                         renewed — restart riptide to sign in again. ({error_msg})"
+                    );
+                }
+                if status == reqwest::StatusCode::FORBIDDEN {
                     tracing::debug!("Track {track_id} ({quality}): {error_msg}");
                     continue;
                 }

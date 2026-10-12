@@ -37,7 +37,7 @@ fn mix_from_playlist(
 
 impl ApiClient {
     async fn get_mixes(&self, endpoint: &str) -> Result<Vec<Playlist>> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         // `items.coverArt` is the only way to get a mix's cover: the playlist
         // objects themselves carry no image attribute, verified live against all
         // three endpoints. Without it every mix reaches the Home tab coverless.
@@ -116,7 +116,7 @@ impl ApiClient {
         &self,
         mix_id: &str,
     ) -> Result<(Vec<Track>, u32, Option<String>, Option<String>)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/playlists/{mix_id}?countryCode=US&include=items.artists,coverArt"
         );

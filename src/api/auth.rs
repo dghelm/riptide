@@ -46,18 +46,18 @@ fn auth_error(context: &str, resp: reqwest::blocking::Response) -> anyhow::Error
     anyhow::anyhow!("{context} returned {status}: {detail}")
 }
 
-fn client_id(config: &Config) -> &str {
+pub(crate) fn client_id(config: &Config) -> &str {
     config.client_id.as_deref().unwrap_or(DEFAULT_CLIENT_ID)
 }
 
-fn client_secret(config: &Config) -> &str {
+pub(crate) fn client_secret(config: &Config) -> &str {
     config
         .client_secret
         .as_deref()
         .unwrap_or(DEFAULT_CLIENT_SECRET)
 }
 
-const AUTH_BASE: &str = "https://auth.tidal.com/v1/oauth2";
+pub(crate) const AUTH_BASE: &str = "https://auth.tidal.com/v1/oauth2";
 
 /// Current auth generation. Bump this when changing client credentials
 /// or auth method — forces users to re-authenticate.

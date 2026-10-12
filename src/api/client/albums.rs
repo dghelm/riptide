@@ -110,7 +110,7 @@ impl ApiClient {
         &self,
         next_url: Option<String>,
     ) -> Result<(Vec<Album>, Option<String>)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         // links.next comes back as a path rather than an absolute URL, matching
         // how the other paginated endpoints here are followed.
         let url = match next_url {
@@ -224,7 +224,7 @@ impl ApiClient {
     }
 
     pub async fn get_album(&self, album_id: u64) -> Result<(Album, Option<String>)> {
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!("{OPENAPI_BASE}/albums/{album_id}?include=coverArt");
 
         let resp = self
@@ -314,7 +314,7 @@ impl ApiClient {
 
     pub async fn get_album_tracks(&self, album_id: u64) -> Result<Page<Track>> {
         tracing::debug!("Fetching album tracks for album {}", album_id);
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let mut tracks = Vec::new();
         let mut next_url = Some(format!(
             "{OPENAPI_BASE}/albums/{album_id}/relationships/items?locale=en-US&include=items.albums,items.artists"

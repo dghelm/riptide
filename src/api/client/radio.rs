@@ -125,7 +125,7 @@ fn parse_radio_response(api_resp: &serde_json::Value) -> Result<Vec<Track>> {
 impl ApiClient {
     pub async fn get_track_radio(&self, track_id: u64) -> Result<Page<Track>> {
         tracing::debug!("Fetching radio for track {}", track_id);
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/tracks/{track_id}/relationships/radio?locale=en-US&include=radio.items.albums,radio.items.artists"
         );
@@ -162,7 +162,7 @@ impl ApiClient {
 
     pub async fn get_artist_radio(&self, artist_id: u64) -> Result<Page<Track>> {
         tracing::debug!("Fetching radio for artist {}", artist_id);
-        let token = self.token.read().await.clone();
+        let token = self.access_token().await?;
         let url = format!(
             "{OPENAPI_BASE}/artists/{artist_id}/relationships/radio?locale=en-US&include=radio.items.albums,radio.items.artists"
         );
